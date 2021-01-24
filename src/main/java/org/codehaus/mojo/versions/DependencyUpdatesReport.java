@@ -19,14 +19,6 @@ package org.codehaus.mojo.versions;
  * under the License.
  */
 
-import java.io.File;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
-
 import org.apache.maven.artifact.metadata.ArtifactMetadataRetrievalException;
 import org.apache.maven.artifact.versioning.InvalidVersionSpecificationException;
 import org.apache.maven.doxia.sink.Sink;
@@ -37,7 +29,11 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.reporting.MavenReportException;
 import org.codehaus.mojo.versions.api.ArtifactVersions;
 import org.codehaus.mojo.versions.utils.DependencyComparator;
+import org.codehaus.mojo.versions.utils.DependencyHelper;
 import org.codehaus.plexus.util.StringUtils;
+
+import java.io.File;
+import java.util.*;
 
 /**
  * Generates a report of available updates for the dependencies of a project.
@@ -77,6 +73,15 @@ public class DependencyUpdatesReport
      */
     @Parameter( property = "dependencyUpdatesReportFormats", defaultValue = "html" )
     private String[] formats = new String[] { "html" };
+
+
+    /**
+     * Limit finding available updates to specific artifacts. Defaults to no limit.
+     *
+     * @since 2.9
+     */
+    @Parameter(property = "includes")
+    private String includes;
 
     /**
      * {@inheritDoc}
@@ -143,6 +148,9 @@ public class DependencyUpdatesReport
             dependencies = removeDependencyManagment( dependencies, dependencyManagement );
         }
 
+        dependencies = DependencyHelper.filterIncludes( dependencies, includes );
+        dependencyManagement = DependencyHelper.filterIncludes( dependencyManagement, includes );
+
         try
         {
             Map<Dependency, ArtifactVersions> dependencyUpdates =
@@ -175,6 +183,13 @@ public class DependencyUpdatesReport
                     DependencyUpdatesXmlRenderer xmlGenerator =
                         new DependencyUpdatesXmlRenderer( dependencyUpdates, dependencyManagementUpdates, outputFile );
                     xmlGenerator.render();
+                }
+                else if ( "json".equals( format ) ) {
+
+                    File outputDir = new File(getProject().getBuild().getDirectory());
+                    String outputFile = outputDir.getAbsolutePath() + File.separator + getOutputName() + ".json";
+                    DependencyUpdatesJsonRenderer dependencyUpdatesJsonRenderer = new DependencyUpdatesJsonRenderer(dependencyUpdates, dependencyManagementUpdates, outputFile, allowSnapshots);
+                    dependencyUpdatesJsonRenderer.render();
                 }
             }
         }
